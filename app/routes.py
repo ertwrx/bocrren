@@ -26,30 +26,30 @@ def ocr_rename():
         return jsonify({'error': 'No selected file'}), 400
 
     try:
-        # --- START OF MODIFIED LOGIC ---
         # 1. Get the raw configuration from the form
         custom_prefix = request.form.get('custom_prefix', '').strip()
         separator = request.form.get('separator', '_')
         component_list = []  # Initialize empty list
-
-        # Add targeted label first if it's being used
+    
+        # Get the user's component selections
+        component_list_str = request.form.get('component_list', '')
+        selected_components = [c.strip() for c in component_list_str.split(',') if c.strip()]
+    
+        # Add targeted label if it's being used
         targeted_label_term = request.form.get('targeted_label_term', '').strip()
         if targeted_label_term:
-             component_list.append('targeted_label')
+            component_list.append('targeted_label')
+    
+        # Add other selected components
+        component_list.extend(selected_components)
+    
+        # Process the file
+        extracted_text = services.process_file_stream(file.stream, file_extension)
+        print("----- TESSERACT RAW OUTPUT -----\n", extracted_text, "\n------------------------------")
+    
+        # Extract metadata with both search terms
+        metadata = services.extract_metadata(extracted_text, custom_search_term, targeted_label_term)
 
-        # Add custom search term next if it's being used
-        custom_search_term = request.form.get('custom_search_term', '').strip()
-        if custom_search_term:
-            component_list.append('custom_match')
-
-        # Add other selected components after custom_match
-        component_list_str = request.form.get('component_list', '')
-        if component_list_str:
-            additional_components = [c.strip() for c in component_list_str.split(',') if c.strip()]
-             # Only add components that aren't already in the list
-            for comp in additional_components:
-                if comp not in component_list:
-                    component_list.append(comp)
         # 2. **INTELLIGENTLY MODIFY THE COMPONENT LIST**
         # If the user is searching for a custom term, we should USE it in the filename.
         # We'll put it at the very beginning of the list for priority.

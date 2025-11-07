@@ -145,12 +145,14 @@ def extract_metadata(text, custom_search_term=None, targeted_label_term=None):
                 targeted_label_str = label_match.group(1).strip()
                 # Remove ALL special characters, keeping only alphanumeric
                 targeted_label_str = re.sub(r'[^a-zA-Z0-9]', '', targeted_label_str)
-                if not targeted_label_str:
+                if targeted_label_str:
+                    print(f"Found targeted label match: {targeted_label_str}")  # Add debug print
+                else:
                     targeted_label_str = None
         except Exception as e:
             print(f"Error during targeted label search: {e}")
             targeted_label_str = None
-
+    
     # 6. Find Vendor Name
     first_line = text.split('\n', 1)[0].strip()
     vendor_str = re.sub(r'[^a-zA-Z0-9\s-]', '', first_line).strip()[:20].replace(' ', '_')
