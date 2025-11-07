@@ -150,8 +150,8 @@ def extract_metadata(text, custom_search_term=None):
 def create_suggested_name(metadata, original_extension, custom_prefix='', separator='_', component_list=None):
     if component_list is None:
         component_list = ['custom_match']  # Default to custom_match if no components specified    
+    name_parts = []  # Initialize name_parts list
     if custom_prefix: name_parts.append(re.sub(r'[^a-zA-Z0-9_.-]', '', custom_prefix).strip())
-
     component_map = {
         'date': metadata['date'] or datetime.date.today().strftime('%Y%m%d'),
         'vendor': metadata.get('vendor', "GENERIC"), 'amount': metadata.get('amount'),
