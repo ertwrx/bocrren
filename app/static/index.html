@@ -306,7 +306,7 @@
             formData.append('component_list', componentList);
             
             // Send both custom search terms to the server
-            formData.append('regex_prefix_term', regexPrefixTerm); 
+            formData.append('custom_search_term', regexPrefixTerm); 
             formData.append('targeted_label_term', targetedLabelTerm); 
 
             try {
@@ -314,7 +314,8 @@
                     method: 'POST',
                     body: formData,
                 });
-                
+            
+    
                 if (!response.ok) {
                     const errorData = await response.json();
                     throw new Error(errorData.error || `HTTP Error: ${response.status}`);

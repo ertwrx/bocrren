@@ -101,18 +101,38 @@ def extract_metadata(text, custom_search_term=None):
     custom_match_str = None
     if custom_search_term:
         try:
-            # This pattern finds a whole "word" (letters, numbers, hyphens)
-            # that contains the user's search term.
-            pattern = r'[a-zA-Z0-9-]*' + re.escape(custom_search_term) + r'[a-zA-Z0-9-]*'
-            custom_match = re.search(pattern, text, re.IGNORECASE)
+            # Check if the search term contains only numbers
+            if custom_search_term.isdigit():
+                # For numeric IDs, look for the number followed by digits and hyphens
+                pattern = f'{custom_search_term}[\\d-]+'
+                matches = re.finditer(pattern, text)
+                longest_match = None
+                max_length = 0
+                
+                # Find the longest matching sequence
+                for match in matches:
+                    match_text = match.group(0)
+                    if len(match_text) > max_length:
+                        max_length = len(match_text)
+                        longest_match = match_text
+                
+                if longest_match:
+                    custom_match_str = longest_match
+            else:
+                # For non-numeric patterns, use the original approach
+                pattern = r'[a-zA-Z0-9-]*' + re.escape(custom_search_term) + r'[a-zA-Z0-9-]*'
+                custom_match = re.search(pattern, text, re.IGNORECASE)
+                if custom_match:
+                    custom_match_str = custom_match.group(0).strip()
             
-            if custom_match:
-                full_match = custom_match.group(0).strip()
-                # Sanitize for filename
-                custom_match_str = re.sub(r'[^a-zA-Z0-9-]', '_', full_match).strip('_')[:40] # Increased length
+            # Only clean the match if we found one
+            if custom_match_str:
+                # Sanitize for filename but preserve hyphens for IDs
+                custom_match_str = re.sub(r'[^a-zA-Z0-9-]', '', custom_match_str).strip('_')
         except Exception as e:
             print(f"Error during custom regex search: {e}")
-            pass
+            custom_match_str = None
+
     # --- END OF CORRECTED SECTION ---
 
     # 5. Find a key entity (vendor name)
@@ -128,14 +148,8 @@ def extract_metadata(text, custom_search_term=None):
     }
 
 def create_suggested_name(metadata, original_extension, custom_prefix='', separator='_', component_list=None):
-    """
-    Constructs the suggested filename from extracted metadata.
-    (This is your original function)
-    """
-    if component_list is None: component_list = ['date', 'vendor'] 
-
-    name_parts = []
-    
+    if component_list is None:
+        component_list = ['custom_match']  # Default to custom_match if no components specified    
     if custom_prefix: name_parts.append(re.sub(r'[^a-zA-Z0-9_.-]', '', custom_prefix).strip())
 
     component_map = {
