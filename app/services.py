@@ -79,13 +79,21 @@ def extract_metadata(text, custom_search_term=None, targeted_label_term=None):
     """
     Analyzes the extracted text to find key metadata for filename generation.
     """
+    # Initialize all variables at the start
+    date_str = None
+    amount_str = None
+    invoice_str = None
+    reference_str = None
+    custom_match_str = None
+    targeted_label_str = None
+    vendor_str = None
+
     # 1. Find Date
     date_match = re.search(r'\d{1,2}[/-]\d{1,2}[/-]\d{2,4}', text)
     date_str = date_match.group(0).replace('/', '-') if date_match else None
     
     # 2. Find Amount
     amount_match = re.search(r'([Ss]?\s*|Total|TOTAL|Amount)\s*[\$€£]?\s*(\d{1,3}(?:[,\.\s]?\d{3})*(?:[\.,]\d{2}))', text, re.IGNORECASE)
-    amount_str = None
     if amount_match:
         amount = amount_match.group(2).replace(',', '') 
         amount_str = f"USD-{amount}"
@@ -96,20 +104,15 @@ def extract_metadata(text, custom_search_term=None, targeted_label_term=None):
     invoice_str = invoice_match.group(2).strip().upper().replace(' ', '_') if invoice_match else None
     reference_str = reference_match.group(2).strip().upper().replace(' ', '_') if reference_match and not invoice_match else None
 
-    # --- START OF CORRECTED SECTION 4 ---
-    # 4. Find Custom Search Term Match (New, more robust logic)
-    custom_match_str = None
+    # 4. Find Custom Search Term Match
     if custom_search_term:
         try:
-            # Check if the search term contains only numbers
             if custom_search_term.isdigit():
-                # For numeric IDs, look for the number followed by digits and hyphens
                 pattern = f'{custom_search_term}[\\d-]+'
                 matches = re.finditer(pattern, text)
                 longest_match = None
                 max_length = 0
                 
-                # Find the longest matching sequence
                 for match in matches:
                     match_text = match.group(0)
                     if len(match_text) > max_length:
@@ -119,37 +122,37 @@ def extract_metadata(text, custom_search_term=None, targeted_label_term=None):
                 if longest_match:
                     custom_match_str = longest_match
             else:
-                # For non-numeric patterns, use the original approach
                 pattern = r'[a-zA-Z0-9-]*' + re.escape(custom_search_term) + r'[a-zA-Z0-9-]*'
                 custom_match = re.search(pattern, text, re.IGNORECASE)
                 if custom_match:
                     custom_match_str = custom_match.group(0).strip()
             
-            # Only clean the match if we found one
             if custom_match_str:
-                # Sanitize for filename but preserve hyphens for IDs
                 custom_match_str = re.sub(r'[^a-zA-Z0-9-]', '', custom_match_str).strip('_')
         except Exception as e:
             print(f"Error during custom regex search: {e}")
             custom_match_str = None
-    targeted_label_str = None
+
+    # 5. Find Targeted Label Match
     if targeted_label_term:
         try:
-            # Escape special characters in the label term
             escaped_term = re.escape(targeted_label_term)
-            # Look for the text after the label, up to the next newline or end of text
             pattern = f'{escaped_term}\\s*([^\\n]+)'
             label_match = re.search(pattern, text, re.IGNORECASE)
             if label_match:
-                # Get the text after the label and clean it
                 targeted_label_str = label_match.group(1).strip()
-                # Sanitize for filename
                 targeted_label_str = re.sub(r'[^a-zA-Z0-9-]', '_', targeted_label_str).strip('_')
         except Exception as e:
             print(f"Error during targeted label search: {e}")
             targeted_label_str = None
 
-    # Update the return dictionary to include targeted label
+    # 6. Find Vendor Name
+    first_line = text.split('\n', 1)[0].strip()
+    vendor_str = re.sub(r'[^a-zA-Z0-9\s-]', '', first_line).strip()[:20].replace(' ', '_')
+    if not vendor_str:
+        vendor_str = "OCR_Scan"
+
+    # Return all metadata
     return {
         'date': date_str,
         'vendor': vendor_str,
@@ -157,22 +160,7 @@ def extract_metadata(text, custom_search_term=None, targeted_label_term=None):
         'invoice_number': invoice_str,
         'reference_number': reference_str,
         'custom_match': custom_match_str,
-        'targeted_label': targeted_label_str  # Add this line
-    }
-
-
-    # --- END OF CORRECTED SECTION ---
-
-    # 5. Find a key entity (vendor name)
-    first_line = text.split('\n', 1)[0].strip()
-    vendor_str = re.sub(r'[^a-zA-Z0-9\s-]', '', first_line).strip()[:20].replace(' ', '_')
-    if not vendor_str:
-        vendor_str = "OCR_Scan"
-            
-    return {
-        'date': date_str, 'vendor': vendor_str, 'amount': amount_str,
-        'invoice_number': invoice_str, 'reference_number': reference_str,
-        'custom_match': custom_match_str
+        'targeted_label': targeted_label_str
     }
 
 def create_suggested_name(metadata, original_extension, custom_prefix='', separator='_', component_list=None):
