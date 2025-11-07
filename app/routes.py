@@ -27,17 +27,21 @@ def ocr_rename():
 
     try:
         # --- START OF MODIFIED LOGIC ---
-
-        # 1. Get the raw configuration from the form
+       # 1. Get the raw configuration from the form
         custom_prefix = request.form.get('custom_prefix', '').strip()
         separator = request.form.get('separator', '_')
-        component_list = ['custom_match']  # Start with custom_match
-        custom_search_term = request.form.get('custom_search_term', '').strip()
+        component_list = []  # Initialize empty list
+        targeted_label_term = request.form.get('targeted_label_term', '').strip()
 
-        # Add other selected components after custom_match
-        component_list_str = request.form.get('component_list', '')
-        if component_list_str:
-            component_list.extend([c.strip() for c in component_list_str.split(',') if c.strip()])
+       # Add targeted label first if it's being used
+        if targeted_label_term:
+            component_list.append('targeted_label')
+
+       # Add custom search term next if it's being used
+        custom_search_term = request.form.get('custom_search_term', '').strip()
+        if custom_search_term:
+            component_list.append('custom_match')
+
         # 2. **INTELLIGENTLY MODIFY THE COMPONENT LIST**
         # If the user is searching for a custom term, we should USE it in the filename.
         # We'll put it at the very beginning of the list for priority.

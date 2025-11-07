@@ -75,7 +75,7 @@ def process_file_stream(file_stream, file_extension):
 
 # In app/services.py
 
-def extract_metadata(text, custom_search_term=None):
+def extract_metadata(text, custom_search_term=None, targeted_label_term=None):
     """
     Analyzes the extracted text to find key metadata for filename generation.
     """
@@ -132,6 +132,34 @@ def extract_metadata(text, custom_search_term=None):
         except Exception as e:
             print(f"Error during custom regex search: {e}")
             custom_match_str = None
+    targeted_label_str = None
+    if targeted_label_term:
+        try:
+            # Escape special characters in the label term
+            escaped_term = re.escape(targeted_label_term)
+            # Look for the text after the label, up to the next newline or end of text
+            pattern = f'{escaped_term}\\s*([^\\n]+)'
+            label_match = re.search(pattern, text, re.IGNORECASE)
+            if label_match:
+                # Get the text after the label and clean it
+                targeted_label_str = label_match.group(1).strip()
+                # Sanitize for filename
+                targeted_label_str = re.sub(r'[^a-zA-Z0-9-]', '_', targeted_label_str).strip('_')
+        except Exception as e:
+            print(f"Error during targeted label search: {e}")
+            targeted_label_str = None
+
+    # Update the return dictionary to include targeted label
+    return {
+        'date': date_str,
+        'vendor': vendor_str,
+        'amount': amount_str,
+        'invoice_number': invoice_str,
+        'reference_number': reference_str,
+        'custom_match': custom_match_str,
+        'targeted_label': targeted_label_str  # Add this line
+    }
+
 
     # --- END OF CORRECTED SECTION ---
 
@@ -153,10 +181,14 @@ def create_suggested_name(metadata, original_extension, custom_prefix='', separa
     name_parts = []  # Initialize name_parts list
     if custom_prefix: name_parts.append(re.sub(r'[^a-zA-Z0-9_.-]', '', custom_prefix).strip())
     component_map = {
-        'date': metadata['date'] or datetime.date.today().strftime('%Y%m%d'),
-        'vendor': metadata.get('vendor', "GENERIC"), 'amount': metadata.get('amount'),
-        'invoice_number': metadata.get('invoice_number'), 'reference_number': metadata.get('reference_number'),
-        'custom_match': metadata.get('custom_match'), 'timestamp': datetime.datetime.now().strftime('%H%M%S') 
+    'date': metadata['date'] or datetime.date.today().strftime('%Y%m%d'),
+    'vendor': metadata.get('vendor', "GENERIC"),
+    'amount': metadata.get('amount'),
+    'invoice_number': metadata.get('invoice_number'),
+    'reference_number': metadata.get('reference_number'),
+    'custom_match': metadata.get('custom_match'),
+    'targeted_label': metadata.get('targeted_label'),  # Add this line
+    'timestamp': datetime.datetime.now().strftime('%H%M%S')
     }
     
     for key in component_list:
