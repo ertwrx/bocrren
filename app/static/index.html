@@ -1,0 +1,503 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Portable OCR File Renamer</title>
+    <!-- Load Tailwind CSS for styling -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    
+    <style>
+        /* Custom font and base styling */
+        body { font-family: 'Inter', sans-serif; background-color: #f7f7f7; }
+        /* Style for the start button */
+        .start-button {
+            background-image: linear-gradient(to right, #4F46E5 0%, #7C3AED 51%, #4F46E5 100%);
+            margin: 10px;
+            text-align: center;
+            text-transform: uppercase;
+            transition: 0.5s;
+            background-size: 200% auto;
+            color: white;
+            box-shadow: 0 0 20px #eee;
+            border-radius: 10px;
+            display: block;
+        }
+        .start-button:hover {
+            background-position: right center; /* change the direction of the change here */
+            color: #fff;
+            text-decoration: none;
+        }
+    </style>
+</head>
+<body class="p-4 sm:p-8 min-h-screen flex items-center justify-center">
+
+    <div id="app" class="w-full max-w-4xl bg-white shadow-2xl rounded-xl p-6 md:p-10">
+        <header class="text-center mb-8">
+            <h1 class="text-3xl font-bold text-gray-800">Batch OCR Renamer</h1>
+            <p class="text-gray-500 mt-2">Drop files below, then click 'Start Batch' to rename and download them automatically.</p>
+            <p id="serverInfo" class="text-xs text-gray-400 mt-1">Server: http://127.0.0.1:5000</p>
+        </header>
+
+        <!-- File Upload Area (Queuing) -->
+        <div class="border-2 border-dashed border-indigo-300 rounded-lg p-6 text-center hover:border-indigo-500 transition duration-300 cursor-pointer mb-6"
+             onclick="document.getElementById('fileInput').click()">
+            <svg xmlns="http://www.w3.org/2000/svg" class="mx-auto h-12 w-12 text-indigo-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 014 4v2a4 4 0 01-4 4h-4a4 4 0 01-4-4v-4m-2 4h4m-4 0v-4" />
+            </svg>
+            <p class="mt-2 text-sm text-gray-600 font-medium">Click or Drag & Drop documents here (.JPG, .PNG, .PDF)</p>
+            <input type="file" id="fileInput" accept="image/jpeg, image/png, application/pdf" multiple class="hidden" onchange="handleFiles(this.files)">
+        </div>
+        
+        <!-- Custom Naming Options -->
+        <div class="mb-6 grid grid-cols-1 md:grid-cols-2 gap-4 p-4 bg-gray-50 rounded-lg border border-gray-200">
+            
+            <!-- STEP 1: PREFIX & SEPARATOR -->
+            <div class="col-span-2">
+                <label class="block text-sm font-bold text-gray-800 mb-2">1. Custom Prefix & Separator</label>
+                <div class="grid grid-cols-2 md:grid-cols-4 gap-4">
+                    <div class="col-span-2">
+                        <label for="customPrefix" class="block text-xs font-medium text-gray-700 mb-1">Prefix (Optional)</label>
+                        <input type="text" id="customPrefix" placeholder="e.g., Finance_Q3" 
+                               class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 p-2 border">
+                    </div>
+                    <div class="col-span-2">
+                        <label for="separator" class="block text-xs font-medium text-gray-700 mb-1">Separator Character</label>
+                        <select id="separator" 
+                                class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 p-2 border bg-white">
+                            <option value="_">Underscore (_)</option>
+                            <option value="-">Hyphen (-)</option>
+                            <option value=".">Dot (.)</option>
+                            <option value="" selected>NONE (No Separator)</option>
+                        </select>
+                    </div>
+                </div>
+            </div>
+
+            <!-- STEP 2: SELECT FILENAME COMPONENTS -->
+            <div class="col-span-2 mt-4">
+                <label class="block text-sm font-bold text-gray-800 mb-4">2. Select Filename Components (Order is fixed)</label>
+                
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
+                    
+                    <!-- NEW COMPONENT: TARGETED FIELD MATCH (for NAME: or ID:) -->
+                    <div class="p-3 bg-white rounded-md shadow border border-purple-300">
+                        <label class="inline-flex items-center cursor-pointer mb-2">
+                            <input type="checkbox" name="component" value="targeted_label" id="targetedLabelCheckbox" class="form-checkbox h-4 w-4 text-purple-600 rounded">
+                            <span class="ml-2 text-sm text-gray-700 font-semibold">Targeted Field Match</span>
+                        </label>
+                        
+                        <label for="targetedLabelTerm" class="block text-xs font-medium text-gray-500 mb-1">Target Label to Extract Value After:</label>
+                        <input type="text" id="targetedLabelTerm" placeholder="e.g., NAME: or Employee ID:" 
+                               class="block w-full rounded-md border-gray-300 shadow-sm focus:border-purple-500 focus:ring-purple-500 p-2 text-sm border"
+                               oninput="updateTargetedLabelComponent()">
+                               
+                        <p class="text-xs text-gray-400 mt-1">Finds the label (e.g., "NAME:") and captures the text immediately following it.</p>
+                    </div>
+
+                    <!-- EXISTING COMPONENT: REGEX PREFIX MATCH (for PO- or INV-) -->
+                    <div class="p-3 bg-white rounded-md shadow border border-indigo-300">
+                        <label class="inline-flex items-center cursor-pointer mb-2">
+                            <input type="checkbox" name="component" value="regex_prefix" id="regexPrefixCheckbox" class="form-checkbox h-4 w-4 text-indigo-600 rounded">
+                            <span class="ml-2 text-sm text-gray-700 font-semibold">Regex Prefix Match (ID/Code)</span>
+                        </label>
+                        
+                        <label for="regexPrefixTerm" class="block text-xs font-medium text-gray-500 mb-1">Regex Prefix Search Term:</label>
+                        <input type="text" id="regexPrefixTerm" placeholder="e.g., 782 or PO-" 
+                               class="block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 p-2 text-sm border"
+                               oninput="updateRegexPrefixComponent()">
+                               
+                        <p class="text-xs text-gray-400 mt-1">Finds this prefix followed by an alphanumeric sequence (e.g., PO-1234-XYZ).</p>
+                    </div>
+
+                </div>
+                
+                <!-- Standard Components Checkboxes -->
+                <div class="grid grid-cols-2 sm:grid-cols-4 gap-3">
+                    
+                    <!-- 1. Vendor Name (checked by default) -->
+                    <label class="inline-flex items-center p-2 bg-white rounded-md shadow-sm border border-gray-200 cursor-pointer">
+                        <input type="checkbox" name="component" value="vendor" checked class="form-checkbox h-4 w-4 text-indigo-600 rounded">
+                        <span class="ml-2 text-sm text-gray-700">Vendor Name</span>
+                    </label>
+
+                    <!-- 2. Reference No. (unchecked by default) -->
+                    <label class="inline-flex items-center p-2 bg-white rounded-md shadow-sm border border-gray-200 cursor-pointer">
+                        <input type="checkbox" name="component" value="reference_number" class="form-checkbox h-4 w-4 text-indigo-600 rounded">
+                        <span class="ml-2 text-sm text-gray-700">Reference No.</span>
+                    </label>
+                    
+                    <!-- 3. Invoice No. (unchecked by default) -->
+                    <label class="inline-flex items-center p-2 bg-white rounded-md shadow-sm border border-gray-200 cursor-pointer">
+                        <input type="checkbox" name="component" value="invoice_number" class="form-checkbox h-4 w-4 text-indigo-600 rounded">
+                        <span class="ml-2 text-sm text-gray-700">Invoice No.</span>
+                    </label>
+                    
+                    <!-- 5. Amount (USD) (unchecked by default) -->
+                    <label class="inline-flex items-center p-2 bg-white rounded-md shadow-sm border border-gray-200 cursor-pointer">
+                        <input type="checkbox" name="component" value="amount" class="form-checkbox h-4 w-4 text-indigo-600 rounded">
+                        <span class="ml-2 text-sm text-gray-700">Amount (USD)</span>
+                    </label>
+                    
+                    <!-- 6. Date (YYYYMMDD) (checked by default) -->
+                    <label class="inline-flex items-center p-2 bg-white rounded-md shadow-sm border border-gray-200 cursor-pointer">
+                        <input type="checkbox" name="component" value="date" checked class="form-checkbox h-4 w-4 text-indigo-600 rounded">
+                        <span class="ml-2 text-sm text-gray-700">Date (YYYYMMDD)</span>
+                    </label>
+                    
+                    <!-- 7. Timestamp (unchecked by default) -->
+                    <label class="inline-flex items-center p-2 bg-white rounded-md shadow-sm border border-gray-200 cursor-pointer">
+                        <input type="checkbox" name="component" value="timestamp" class="form-checkbox h-4 w-4 text-indigo-600 rounded">
+                        <span class="ml-2 text-sm text-gray-700">Timestamp</span>
+                    </label>
+                </div>
+                <p class="text-xs text-gray-400 mt-4">The final filename component order is fixed regardless of display order: Vendor, Reference No., Invoice No., **Targeted Field Match**, **Regex Prefix Match**, Amount, Date, Timestamp.</p>
+            </div>
+        </div>
+
+
+        <!-- Batch Control and Status -->
+        <div class="mb-6 flex flex-col sm:flex-row items-center justify-between space-y-4 sm:space-y-0">
+            <div class="flex items-center space-x-2">
+                <p class="text-lg font-semibold text-gray-700">Files Queued:</p>
+                <span id="fileCount" class="text-2xl font-bold text-indigo-600">0</span>
+            </div>
+
+            <button id="startButton" onclick="startBatchProcessing()" disabled
+                    class="start-button py-3 px-8 text-base shadow-lg transition duration-300 disabled:opacity-50 disabled:cursor-not-allowed">
+                Start Batch Processing
+            </button>
+        </div>
+
+        <!-- Progress and Status -->
+        <div id="statusArea" class="hidden mb-6">
+            <div id="progressBarContainer" class="w-full bg-gray-200 rounded-full h-2.5 mb-2">
+                <div id="progressBar" class="bg-indigo-600 h-2.5 rounded-full transition-all duration-300" style="width: 0%"></div>
+            </div>
+            <p id="statusMessage" class="text-sm text-indigo-600 font-medium text-center">Ready...</p>
+        </div>
+
+        <!-- Queued Files and Results List -->
+        <div id="resultsContainer" class="space-y-3">
+            <p id="listHeader" class="text-sm font-semibold uppercase text-gray-500 hidden border-b pb-1">Processing Queue / Results</p>
+        </div>
+
+        <!-- Toast Notification for Download Success -->
+        <div id="copyToast" class="fixed bottom-5 right-5 bg-indigo-600 text-white px-4 py-2 rounded-lg shadow-xl opacity-0 transition-opacity duration-300">
+            Download started!
+        </div>
+    </div>
+
+    <script>
+        const API_URL = 'http://127.0.0.1:5000/ocr-rename'; 
+        const resultsContainer = document.getElementById('resultsContainer');
+        const statusArea = document.getElementById('statusArea');
+        const progressBar = document.getElementById('progressBar');
+        const statusMessage = document.getElementById('statusMessage');
+        const copyToast = document.getElementById('copyToast');
+        const fileCountSpan = document.getElementById('fileCount');
+        const startButton = document.getElementById('startButton');
+        const listHeader = document.getElementById('listHeader');
+        
+        let fileQueue = [];
+
+        /**
+         * Gets the selected filename components in their fixed display order (the server relies on this order).
+         * @returns {string[]} Array of selected component keys.
+         */
+        function getComponentSelection() {
+            const componentInputs = document.querySelectorAll('input[name="component"]');
+            const selectedComponents = [];
+            
+            // The inputs are deliberately listed in the desired final filename order in the HTML structure
+            componentInputs.forEach(input => {
+                if (input.checked) {
+                    selectedComponents.push(input.value);
+                }
+            });
+            return selectedComponents;
+        }
+
+        /**
+         * Triggers a download for a file object with a specified new filename.
+         */
+        function triggerDownload(fileBlob, newFileName) {
+            const url = URL.createObjectURL(fileBlob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = newFileName;
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+            URL.revokeObjectURL(url); // Clean up the URL object
+            
+            // Show toast notification
+            copyToast.textContent = `Download started for: ${newFileName}`;
+            copyToast.classList.remove('opacity-0', 'bg-red-500');
+            copyToast.classList.add('opacity-100', 'bg-indigo-600');
+            setTimeout(() => {
+                copyToast.classList.remove('opacity-100');
+                copyToast.classList.add('opacity-0');
+            }, 2500);
+        }
+
+        /**
+         * Renders the status/result card in the UI queue list.
+         */
+        function renderQueueItem(file, status = 'Pending', newName = 'N/A', extractedText = '') {
+            const itemId = `item-${file.name.replace(/[^a-zA-Z0-9]/g, '-')}-${file.size}`;
+            let item = document.getElementById(itemId);
+
+            if (!item) {
+                // Create new item for the queue
+                item = document.createElement('div');
+                item.id = itemId;
+                item.className = 'flex items-center justify-between p-3 bg-gray-100 rounded-lg shadow-sm';
+                item.innerHTML = `
+                    <div class="flex-1 min-w-0">
+                        <p class="text-sm font-medium truncate">${file.name}</p>
+                        <p class="text-xs text-gray-500 truncate mt-1" data-field="newName">${newName}</p>
+                    </div>
+                    <div class="flex-shrink-0 ml-4">
+                        <span class="px-2 inline-flex text-xs leading-5 font-semibold rounded-full" data-field="status">${status}</span>
+                    </div>
+                `;
+                resultsContainer.appendChild(item);
+            } else {
+                // Update existing item during processing/completion
+                const statusSpan = item.querySelector('[data-field="status"]');
+                const newNameP = item.querySelector('[data-field="newName"]');
+                
+                statusSpan.textContent = status;
+                newNameP.textContent = newName;
+
+                // Color coding based on status
+                if (status === 'Pending') {
+                    statusSpan.className = 'px-2 inline-flex text-xs leading-5 font-semibold rounded-full bg-yellow-100 text-yellow-800';
+                } else if (status.startsWith('Processing')) {
+                    statusSpan.className = 'px-2 inline-flex text-xs leading-5 font-semibold rounded-full bg-blue-100 text-blue-800 animate-pulse';
+                } else if (status === 'COMPLETE') {
+                    statusSpan.className = 'px-2 inline-flex text-xs leading-5 font-semibold rounded-full bg-green-100 text-green-800';
+                } else if (status.startsWith('ERROR')) {
+                    statusSpan.className = 'px-2 inline-flex text-xs leading-5 font-semibold rounded-full bg-red-100 text-red-800';
+                    newNameP.textContent = extractedText; // Show error message here
+                }
+            }
+        }
+
+        /**
+         * Sends a file to the Python server for OCR processing.
+         * @param {File} file - The file object to upload.
+         */
+        async function processFileOnServer(file) {
+            // Get custom configuration from the UI
+            const customPrefix = document.getElementById('customPrefix').value.trim();
+            const separator = document.getElementById('separator').value.trim(); // Allow empty string
+            const componentList = getComponentSelection().join(','); 
+
+            // Get custom search terms for both modes
+            const regexPrefixTerm = document.getElementById('regexPrefixTerm').value.trim(); 
+            const targetedLabelTerm = document.getElementById('targetedLabelTerm').value.trim(); 
+
+            const formData = new FormData();
+            formData.append('file', file);
+            formData.append('custom_prefix', customPrefix);
+            formData.append('separator', separator);
+            formData.append('component_list', componentList);
+            
+            // Send both custom search terms to the server
+            formData.append('regex_prefix_term', regexPrefixTerm); 
+            formData.append('targeted_label_term', targetedLabelTerm); 
+
+            try {
+                const response = await fetch(API_URL, {
+                    method: 'POST',
+                    body: formData,
+                });
+                
+                if (!response.ok) {
+                    const errorData = await response.json();
+                    throw new Error(errorData.error || `HTTP Error: ${response.status}`);
+                }
+
+                const data = await response.json();
+                
+                return {
+                    suggested_name: data.suggested_name,
+                    extracted_text: data.extracted_text
+                };
+
+            } catch (error) {
+                console.error("Server Processing Error:", error);
+                let userErrorMsg = `ERROR: Failed to connect or Tesseract failed. Details: ${error.message}`;
+                
+                if (error.message.includes('Failed to fetch')) {
+                    userErrorMsg = "ERROR: Connection failed. Ensure the server is running.";
+                } else if (error.message.includes('Tesseract is not installed')) {
+                    userErrorMsg = "ERROR: Tesseract OCR is missing or path is wrong on the server.";
+                } else if (error.message.includes('PDF processing requires')) {
+                    userErrorMsg = "ERROR: Missing PDF dependency (poppler/pdf2image) on the server.";
+                }
+
+                // Return a structure indicating failure
+                return { suggested_name: 'FAILED', extracted_text: userErrorMsg, error: true };
+            }
+        }
+
+        /**
+         * Processes all files currently in the queue sequentially.
+         */
+        async function startBatchProcessing() {
+            if (fileQueue.length === 0) {
+                statusMessage.textContent = 'Queue is empty. Drop files first.';
+                return;
+            }
+            
+            const selectedComponents = getComponentSelection();
+            if (selectedComponents.length === 0) {
+                // Validation failed: No components selected
+                statusMessage.textContent = 'ERROR: Please select at least one Filename Component (Step 2) to rename your files.';
+                // Briefly flash a red notification
+                copyToast.textContent = "Please select at least one filename component!";
+                copyToast.classList.remove('opacity-0', 'bg-indigo-600');
+                copyToast.classList.add('opacity-100', 'bg-red-500');
+                setTimeout(() => {
+                    copyToast.classList.remove('opacity-100');
+                    copyToast.classList.add('opacity-0');
+                }, 4000);
+                return; 
+            }
+
+            startButton.disabled = true;
+            statusArea.classList.remove('hidden');
+            statusMessage.classList.remove('text-red-600'); // Reset error color
+
+            for (let i = 0; i < fileQueue.length; i++) {
+                const file = fileQueue[i];
+                const currentFileIndex = i + 1;
+                const totalFiles = fileQueue.length;
+
+                // 1. Update UI for start of processing
+                statusMessage.textContent = `Processing file ${currentFileIndex}/${totalFiles}: ${file.name}`;
+                renderQueueItem(file, `Processing... (${currentFileIndex}/${totalFiles})`, 'Scanning text...');
+                progressBar.style.width = `${(currentFileIndex - 1) * 100 / totalFiles + 10}%`; // Start progress
+
+                // 2. Call server for OCR and name suggestion
+                const result = await processFileOnServer(file);
+
+                // 3. Update progress bar
+                progressBar.style.width = `${currentFileIndex * 100 / totalFiles}%`;
+
+                if (result.error) {
+                    // Handle failure
+                    renderQueueItem(file, 'ERROR', result.extracted_text, result.extracted_text);
+                    copyToast.textContent = `Error processing ${file.name}`;
+                    copyToast.classList.remove('bg-indigo-600', 'opacity-0');
+                    copyToast.classList.add('bg-red-500', 'opacity-100');
+                    setTimeout(() => copyToast.classList.add('opacity-0'), 2500);
+                } else {
+                    // Handle success: Trigger download with new name
+                    renderQueueItem(file, 'COMPLETE', result.suggested_name, result.extracted_text);
+                    
+                    // The file object (Blob) from the queue is used to ensure the download works correctly
+                    triggerDownload(file, result.suggested_name);
+                }
+            }
+
+            // 4. Final cleanup
+            statusMessage.textContent = `Batch complete! ${fileQueue.length} files processed.`;
+            startButton.disabled = false;
+            fileQueue = []; // Clear the queue
+            fileCountSpan.textContent = 0;
+        }
+
+
+        /**
+         * Processes all uploaded files: queues them for batch processing.
+         */
+        function handleFiles(files) {
+            if (files.length === 0) return;
+            
+            listHeader.classList.remove('hidden');
+            startButton.disabled = false;
+            
+            for (let i = 0; i < files.length; i++) {
+                const file = files[i];
+                // Check if file is already in queue (basic check)
+                const isDuplicate = fileQueue.some(qf => qf.name === file.name && qf.size === file.size);
+                
+                if (!isDuplicate) {
+                    fileQueue.push(file);
+                    renderQueueItem(file); // Render as pending
+                }
+            }
+            fileCountSpan.textContent = fileQueue.length;
+            statusMessage.textContent = `${files.length} file(s) added to queue. Click 'Start Batch Processing' when ready.`;
+        }
+        
+        /**
+         * Automatically checks/unchecks the 'Regex Prefix Match' component based on 
+         * whether the input has content.
+         */
+        function updateRegexPrefixComponent() {
+            const searchTermInput = document.getElementById('regexPrefixTerm');
+            const customMatchCheckbox = document.getElementById('regexPrefixCheckbox');
+
+            if (searchTermInput.value.trim().length > 0) {
+                customMatchCheckbox.checked = true;
+            } else {
+                customMatchCheckbox.checked = false;
+            }
+        }
+
+        /**
+         * Automatically checks/unchecks the 'Targeted Field Match' component based on 
+         * whether the input has content.
+         */
+        function updateTargetedLabelComponent() {
+            const labelTermInput = document.getElementById('targetedLabelTerm');
+            const targetedLabelCheckbox = document.getElementById('targetedLabelCheckbox');
+
+            if (labelTermInput.value.trim().length > 0) {
+                targetedLabelCheckbox.checked = true;
+            } else {
+                targetedLabelCheckbox.checked = false;
+            }
+        }
+        
+        // --- Drag and Drop support (Remains the same) ---
+        const dropArea = document.querySelector('.border-dashed');
+
+        ['dragenter', 'dragover', 'dragleave', 'drop'].forEach(eventName => {
+            dropArea.addEventListener(eventName, preventDefaults, false);
+        });
+
+        function preventDefaults(e) {
+            e.preventDefault();
+            e.stopPropagation();
+        }
+
+        ['dragenter', 'dragover'].forEach(eventName => {
+            dropArea.addEventListener(eventName, () => dropArea.classList.add('border-indigo-500', 'bg-indigo-50'), false);
+        });
+
+        ['dragleave', 'drop'].forEach(eventName => {
+            dropArea.addEventListener(eventName, () => dropArea.classList.remove('border-indigo-500', 'bg-indigo-50'), false);
+        });
+
+        dropArea.addEventListener('drop', handleDrop, false);
+
+        function handleDrop(e) {
+            let dt = e.dataTransfer;
+            let files = dt.files;
+            handleFiles(files);
+        }
+
+        // Expose functions globally for HTML calls
+        window.startBatchProcessing = startBatchProcessing;
+        window.handleFiles = handleFiles;
+        window.updateRegexPrefixComponent = updateRegexPrefixComponent;
+        window.updateTargetedLabelComponent = updateTargetedLabelComponent;
+    </script>
+</body>
+</html>

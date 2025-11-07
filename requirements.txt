@@ -1,0 +1,7 @@
+# requirements.txt
+
+Flask
+Flask-Cors
+Pillow
+pytesseract
+pdf2image
