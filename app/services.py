@@ -136,16 +136,19 @@ def extract_metadata(text, custom_search_term=None, targeted_label_term=None):
     # 5. Find Targeted Label Match
     if targeted_label_term:
         try:
+            # Escape special characters in the label term
             escaped_term = re.escape(targeted_label_term)
+            # Look for the text after the label
             pattern = f'{escaped_term}\\s*([^\\n]+)'
             label_match = re.search(pattern, text, re.IGNORECASE)
             if label_match:
+                # Get the text after the label and clean it
                 targeted_label_str = label_match.group(1).strip()
-                targeted_label_str = re.sub(r'[^a-zA-Z0-9-]', '_', targeted_label_str).strip('_')
+                # Remove ALL special characters, keeping only alphanumeric
+                targeted_label_str = re.sub(r'[^a-zA-Z0-9]', '', targeted_label_str)
         except Exception as e:
             print(f"Error during targeted label search: {e}")
             targeted_label_str = None
-
     # 6. Find Vendor Name
     first_line = text.split('\n', 1)[0].strip()
     vendor_str = re.sub(r'[^a-zA-Z0-9\s-]', '', first_line).strip()[:20].replace(' ', '_')
