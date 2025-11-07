@@ -14,13 +14,13 @@ try:
 except ImportError:
     convert_from_bytes = None
 
-def preprocess_image(image_stream, crop_top_percent=35):
+def preprocess_image(image_stream, crop_top_percent=50):
     """
     Converts an image stream to a preprocessed image for better OCR.
     
     Args:
         image_stream: The file stream of the image
-        crop_top_percent: Percentage of image height to keep from top (default 35%)
+        crop_top_percent: Percentage of image height to keep from top (default 50%)
                          Set to 100 to process entire image
     """
     # Read the image stream into a format OpenCV can use
@@ -44,14 +44,14 @@ def preprocess_image(image_stream, crop_top_percent=35):
     return Image.fromarray(thresh)
 
 
-def process_file_stream(file_stream, file_extension, crop_top_percent=35):
+def process_file_stream(file_stream, file_extension, crop_top_percent=50):
     """
     Processes a file stream (image or PDF) and returns extracted text.
     
     Args:
         file_stream: The file stream to process
         file_extension: The file extension (.jpg, .pdf, etc)
-        crop_top_percent: Percentage of image to scan from top (default 35%)
+        crop_top_percent: Percentage of image to scan from top (default 50%)
     """
     try:
         if file_extension in ['.jpg', '.jpeg', '.png', '.tiff', '.bmp']:
