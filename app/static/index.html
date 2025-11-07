@@ -112,12 +112,12 @@
 
                 </div>
                 
-                <!-- Standard Components Checkboxes -->
+                <!-- Standard Components Checkboxes - ALL UNCHECKED BY DEFAULT -->
                 <div class="grid grid-cols-2 sm:grid-cols-4 gap-3">
                     
-                    <!-- 1. Vendor Name (checked by default) -->
+                    <!-- 1. Vendor Name (UNCHECKED by default) -->
                     <label class="inline-flex items-center p-2 bg-white rounded-md shadow-sm border border-gray-200 cursor-pointer">
-                        <input type="checkbox" name="component" value="vendor" checked class="form-checkbox h-4 w-4 text-indigo-600 rounded">
+                        <input type="checkbox" name="component" value="vendor" class="form-checkbox h-4 w-4 text-indigo-600 rounded">
                         <span class="ml-2 text-sm text-gray-700">Vendor Name</span>
                     </label>
 
@@ -139,9 +139,9 @@
                         <span class="ml-2 text-sm text-gray-700">Amount (USD)</span>
                     </label>
                     
-                    <!-- 6. Date (YYYYMMDD) (checked by default) -->
+                    <!-- 6. Date (YYYYMMDD) (UNCHECKED by default) -->
                     <label class="inline-flex items-center p-2 bg-white rounded-md shadow-sm border border-gray-200 cursor-pointer">
-                        <input type="checkbox" name="component" value="date" checked class="form-checkbox h-4 w-4 text-indigo-600 rounded">
+                        <input type="checkbox" name="component" value="date" class="form-checkbox h-4 w-4 text-indigo-600 rounded">
                         <span class="ml-2 text-sm text-gray-700">Date (YYYYMMDD)</span>
                     </label>
                     
@@ -405,11 +405,13 @@
                 }
             }
 
-            // 4. Final cleanup
-            statusMessage.textContent = `Batch complete! ${fileQueue.length} files processed.`;
-            startButton.disabled = false;
-            fileQueue = []; // Clear the queue
-            fileCountSpan.textContent = 0;
+            // 4. Final cleanup and auto-refresh
+            statusMessage.textContent = `Batch complete! ${fileQueue.length} files processed. Refreshing in 2 seconds...`;
+            
+            // Wait 2 seconds then refresh the page
+            setTimeout(() => {
+                location.reload();
+            }, 2000);
         }
 
 
