@@ -29,14 +29,27 @@
         
         .component-box {
             cursor: grab;
-            transition: all 0.2s;
+            transition: all 0.3s ease;
+            position: relative;
+            will-change: transform, box-shadow;
+        }
+        .component-box:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 8px 16px rgba(79, 70, 229, 0.2);
+            z-index: 10;
         }
         .component-box:active {
             cursor: grabbing;
-            transform: scale(1.05);
+            transform: translateY(-2px) scale(1.02);
         }
         .component-box.dragging {
             opacity: 0.5;
+        }
+        
+        /* Prevent layout shift by adding margin space for hover growth */
+        .component-library-grid {
+            gap: 0.75rem;
+            padding: 0.25rem;
         }
         
         .drop-zone {
@@ -53,6 +66,34 @@
             background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
             color: white;
             box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+            cursor: grab;
+            transition: all 0.2s ease;
+            will-change: transform, box-shadow;
+            /* Reserve space for shadow growth to prevent layout shift */
+            margin: 4px;
+        }
+        .selected-component:hover {
+            /* Only move UP, don't scale or grow */
+            transform: translateY(-2px);
+            box-shadow: 0 6px 12px rgba(0, 0, 0, 0.15);
+            z-index: 10;
+            /* Keep the same size, no margin change */
+        }
+        .selected-component:active {
+            cursor: grabbing;
+        }
+        
+        /* Keep builder area stable during drag operations */
+        .drop-zone {
+            min-height: 80px;
+            transition: background-color 0.3s, border-color 0.3s;
+            /* Prevent height changes during drag */
+            display: flex;
+            flex-wrap: wrap;
+            align-items: flex-start;
+            align-content: flex-start;
+            /* Add padding to accommodate hover shadows without box growing */
+            padding: 1rem;
         }
         
         .remove-btn {
@@ -60,6 +101,11 @@
         }
         .selected-component:hover .remove-btn {
             display: inline-block;
+        }
+        
+        /* Smooth preview updates */
+        #filenamePreview {
+            transition: all 0.2s ease;
         }
     </style>
 </head>
@@ -102,15 +148,21 @@
 
         <!-- STEP 2: Filename Builder (Drag & Drop) -->
         <div class="mb-6 p-4 bg-gradient-to-br from-indigo-50 to-purple-50 rounded-lg border-2 border-indigo-200">
-            <label class="block text-sm font-bold text-gray-800 mb-3">2. Build Your Filename Structure (Drag & Drop)</label>
+            <div class="flex items-center justify-between mb-3">
+                <label class="block text-sm font-bold text-gray-800">2. Build Your Filename Structure (Drag & Drop)</label>
+                <button id="clearAllBtn" onclick="clearAllComponents()" 
+                        class="hidden px-4 py-1 text-xs font-semibold text-red-600 bg-red-50 border border-red-300 rounded-lg hover:bg-red-100 hover:shadow-md transition duration-200">
+                    🗑️ Clear All
+                </button>
+            </div>
             
             <!-- Drop Zone for Building Filename -->
-            <div id="filenameBuilder" class="drop-zone p-4 bg-white rounded-lg border-2 border-dashed border-gray-300 mb-4">
+            <div id="filenameBuilder" class="drop-zone bg-white rounded-lg border-2 border-dashed border-gray-300 mb-4">
                 <p class="text-center text-gray-400 text-sm" id="builderPlaceholder">Drag components here to build your filename...</p>
             </div>
             
             <!-- Available Components Library -->
-            <div class="grid grid-cols-2 md:grid-cols-4 gap-3">
+            <div class="component-library-grid grid grid-cols-2 md:grid-cols-4 gap-3">
                 <!-- Standard Components -->
                 <div class="component-box p-3 bg-white rounded-lg border-2 border-gray-300 hover:border-indigo-400 hover:shadow-md" 
                      draggable="true" 
@@ -339,11 +391,16 @@
         }
 
         function renderFilenameBuilder() {
+            const clearAllBtn = document.getElementById('clearAllBtn');
+            
             if (selectedComponents.length === 0) {
                 filenameBuilder.innerHTML = '<p class="text-center text-gray-400 text-sm" id="builderPlaceholder">Drag components here to build your filename...</p>';
+                clearAllBtn.classList.add('hidden');
                 return;
             }
 
+            // Show Clear All button when components exist
+            clearAllBtn.classList.remove('hidden');
             filenameBuilder.innerHTML = '';
 
             selectedComponents.forEach((comp, index) => {
@@ -382,6 +439,9 @@
                     } else {
                         filenameBuilder.insertBefore(dragging, afterElement);
                     }
+                    
+                    // IMMEDIATE preview update during drag
+                    updatePreviewFromCurrentDOM();
                 });
 
                 compElement.addEventListener('drop', (e) => {
@@ -429,6 +489,18 @@
             updateFilenamePreview();
         }
 
+        function clearAllComponents() {
+            if (selectedComponents.length === 0) return;
+            
+            // Confirm before clearing
+            if (confirm('Are you sure you want to clear all components?')) {
+                selectedComponents = [];
+                renderFilenameBuilder();
+                updateFilenamePreview();
+                showToast('All components cleared!', 'bg-gray-600');
+            }
+        }
+
         function updateFilenamePreview() {
             const separator = document.getElementById('separator').value;
             const prefix = document.getElementById('customPrefix').value.trim();
@@ -443,6 +515,33 @@
             
             selectedComponents.forEach(comp => {
                 previewParts.push(`[${comp.label}]`);
+            });
+
+            const previewText = previewParts.join(separator || '') + '.pdf';
+            filenamePreview.textContent = previewText;
+        }
+
+        function updatePreviewFromCurrentDOM() {
+            // Update preview based on current DOM order during drag (for instant feedback)
+            const separator = document.getElementById('separator').value;
+            const prefix = document.getElementById('customPrefix').value.trim();
+            
+            const componentElements = filenameBuilder.querySelectorAll('.selected-component');
+            
+            if (componentElements.length === 0) {
+                filenamePreview.innerHTML = '<span class="text-gray-400 italic">Add components below...</span>';
+                return;
+            }
+
+            let previewParts = [];
+            if (prefix) previewParts.push(prefix);
+            
+            componentElements.forEach(el => {
+                const index = parseInt(el.getAttribute('data-index'));
+                const comp = selectedComponents[index];
+                if (comp) {
+                    previewParts.push(`[${comp.label}]`);
+                }
             });
 
             const previewText = previewParts.join(separator || '') + '.pdf';
@@ -651,6 +750,7 @@
         window.startBatchProcessing = startBatchProcessing;
         window.handleFiles = handleFiles;
         window.removeComponent = removeComponent;
+        window.clearAllComponents = clearAllComponents;
     </script>
 </body>
 </html>
