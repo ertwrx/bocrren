@@ -38,14 +38,24 @@ def ocr_rename():
         component_list_str = request.form.get('component_list', '')
         component_list = [c.strip() for c in component_list_str.split(',') if c.strip()]
         
-        # Process the file using the service
-        extracted_text = services.process_file_stream(file.stream, original_ext)
+        # Extract original filename without extension for the component
+        original_name_only = os.path.splitext(original_filename)[0]
+        
+        # Process the file using the service WITH ADAPTIVE CROPPING
+        extracted_text = services.process_file_stream(
+            file.stream, 
+            original_ext,
+            component_list=component_list  # Pass components for adaptive cropping
+        )
         
         # Debugging print statement
         print("----- TESSERACT RAW OUTPUT -----\n", extracted_text, "\n------------------------------")
         
         # Extract metadata with both search terms
         metadata = services.extract_metadata(extracted_text, custom_search_term, targeted_label_term)
+        
+        # Add original filename to metadata
+        metadata['original_filename'] = original_name_only
         
         # Create suggested filename
         suggested_name = services.create_suggested_name(

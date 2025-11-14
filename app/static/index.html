@@ -143,6 +143,17 @@
                         <span class="text-gray-400 italic">Add components below...</span>
                     </div>
                 </div>
+                <div>
+                    <label class="block text-xs font-medium text-gray-700 mb-1">Scan Area</label>
+                    <div id="scanAreaInfo" class="mt-1 p-2 bg-indigo-50 border border-indigo-200 rounded-md text-xs text-indigo-700 font-medium">
+                        <span class="flex items-center">
+                            <svg class="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+                            </svg>
+                            Top 50% (Adaptive)
+                        </span>
+                    </div>
+                </div>
             </div>
         </div>
 
@@ -230,6 +241,17 @@
                     <p class="text-xs text-gray-500 mt-1">HHMMSS format</p>
                 </div>
 
+                <div class="component-box p-3 bg-white rounded-lg border-2 border-emerald-300 hover:border-emerald-500 hover:shadow-md" 
+                     draggable="true" 
+                     data-component="original_filename"
+                     data-label="Keep Original"
+                     data-color="bg-emerald-100 text-emerald-800">
+                    <div class="flex items-center justify-between">
+                        <span class="text-sm font-semibold text-gray-700">📄 Keep Original</span>
+                    </div>
+                    <p class="text-xs text-gray-500 mt-1">Original filename</p>
+                </div>
+
                 <!-- Custom Search Components (with input fields) -->
                 <div class="component-box p-3 bg-white rounded-lg border-2 border-indigo-300 hover:border-indigo-500 hover:shadow-md" 
                      draggable="true" 
@@ -303,6 +325,13 @@
         <div id="copyToast" class="fixed bottom-5 right-5 bg-indigo-600 text-white px-4 py-2 rounded-lg shadow-xl opacity-0 transition-opacity duration-300">
             Download started!
         </div>
+        
+        <!-- Footer -->
+        <footer class="mt-8 pt-4 border-t border-gray-200 text-center">
+            <p class="text-xs text-gray-400">
+                Made by <a href="https://github.com/ertwrx" target="_blank" class="text-indigo-500 hover:text-indigo-700 transition">@ertwrx</a>
+            </p>
+        </footer>
     </div>
 
     <script>
@@ -318,10 +347,24 @@
         const filenameBuilder = document.getElementById('filenameBuilder');
         const builderPlaceholder = document.getElementById('builderPlaceholder');
         const filenamePreview = document.getElementById('filenamePreview');
+        const scanAreaInfo = document.getElementById('scanAreaInfo');
         
         let fileQueue = [];
         let selectedComponents = [];
         let draggedElement = null;
+
+        // Component scan depth mapping (matches backend logic)
+        const componentScanDepth = {
+            'vendor': 30,
+            'date': 35,
+            'invoice_number': 40,
+            'reference_number': 40,
+            'custom_match': 40,
+            'targeted_label': 40,
+            'amount': 80,
+            'timestamp': 100,
+            'original_filename': 0  // Doesn't require scanning
+        };
 
         // Initialize drag and drop for components
         document.querySelectorAll('.component-box').forEach(box => {
@@ -507,6 +550,7 @@
             
             if (selectedComponents.length === 0) {
                 filenamePreview.innerHTML = '<span class="text-gray-400 italic">Add components below...</span>';
+                updateScanAreaInfo(50); // Default
                 return;
             }
 
@@ -519,6 +563,55 @@
 
             const previewText = previewParts.join(separator || '') + '.pdf';
             filenamePreview.textContent = previewText;
+            
+            // Update scan area based on selected components
+            updateScanAreaInfo();
+        }
+
+        function updateScanAreaInfo() {
+            if (selectedComponents.length === 0) {
+                scanAreaInfo.innerHTML = `
+                    <span class="flex items-center">
+                        <svg class="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+                        </svg>
+                        Top 50% (Default)
+                    </span>
+                `;
+                return;
+            }
+            
+            // Calculate adaptive crop percentage (same logic as backend)
+            let maxDepth = 50;
+            selectedComponents.forEach(comp => {
+                const depth = componentScanDepth[comp.type] || 50;
+                if (depth > maxDepth) {
+                    maxDepth = depth;
+                }
+            });
+            
+            const adaptiveCrop = Math.min(maxDepth + 20, 100);
+            
+            // Visual feedback
+            let color = 'indigo';
+            let speedText = 'Faster';
+            if (adaptiveCrop > 70) {
+                color = 'orange';
+                speedText = 'Slower';
+            }
+            
+            scanAreaInfo.className = `mt-1 p-2 bg-${color}-50 border border-${color}-200 rounded-md text-xs text-${color}-700 font-medium`;
+            scanAreaInfo.innerHTML = `
+                <span class="flex items-center justify-between">
+                    <span class="flex items-center">
+                        <svg class="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"></path>
+                        </svg>
+                        Top ${adaptiveCrop}% (Adaptive)
+                    </span>
+                    <span class="text-xs opacity-75">${speedText}</span>
+                </span>
+            `;
         }
 
         function updatePreviewFromCurrentDOM() {
@@ -540,7 +633,11 @@
                 const index = parseInt(el.getAttribute('data-index'));
                 const comp = selectedComponents[index];
                 if (comp) {
-                    previewParts.push(`[${comp.label}]`);
+                    if (comp.type === 'original_filename') {
+                        previewParts.push('[OriginalName]');
+                    } else {
+                        previewParts.push(`[${comp.label}]`);
+                    }
                 }
             });
 
@@ -665,6 +762,16 @@
         async function startBatchProcessing() {
             if (fileQueue.length === 0) {
                 statusMessage.textContent = 'Queue is empty. Drop files first.';
+                return;
+            }
+            
+            // VALIDATION: Check if only "Keep Original" is selected
+            const onlyOriginalSelected = selectedComponents.length === 1 && 
+                                         selectedComponents[0].type === 'original_filename';
+            
+            if (onlyOriginalSelected) {
+                statusMessage.textContent = 'ERROR: Keep Original alone doesn\'t make sense!';
+                showToast('🤦 Add at least ONE more component! Just "Keep Original" changes nothing!', 'bg-red-500');
                 return;
             }
             
