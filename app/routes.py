@@ -41,11 +41,12 @@ def ocr_rename():
         # Extract original filename without extension for the component
         original_name_only = os.path.splitext(original_filename)[0]
         
-        # Process the file using the service WITH ADAPTIVE CROPPING
+        # Process the file using the service WITH FORCED 100% SCAN FOR DEBUGGING
         extracted_text = services.process_file_stream(
             file.stream, 
             original_ext,
-            component_list=component_list  # Pass components for adaptive cropping
+            crop_top_percent=100,  # FORCE FULL SCAN
+            component_list=component_list
         )
         
         # Debugging print statement

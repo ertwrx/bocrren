@@ -14,7 +14,7 @@ try:
 except ImportError:
     convert_from_bytes = None
 
-def preprocess_image(image_stream, crop_top_percent=50, max_width=1920):
+def preprocess_image(image_stream, crop_top_percent=100, max_width=1920):
     """
     Converts an image stream to a preprocessed image for better OCR.
     
@@ -138,7 +138,7 @@ def calculate_adaptive_crop(component_list):
         int: Recommended crop percentage (30-100)
     """
     if not component_list:
-        return 50  # Default
+        return 100  # Default
     
     # Define where each component typically appears on documents
     component_locations = {
