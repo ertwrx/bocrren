@@ -151,7 +151,7 @@ def calculate_adaptive_crop(component_list):
         'invoice_number': 40,
         'reference_number': 40,
         'custom_match': 40,  # Usually near header
-        'targeted_label': 50,  # Usually in header/top section
+        'targeted_label': 40,  # Usually in header/top section
         
         # Bottom section (60-100%)
         'amount': 80,  # Totals usually at bottom
@@ -168,7 +168,7 @@ def calculate_adaptive_crop(component_list):
                 max_location = component_depth
     
     # Add 20% buffer to ensure we capture the full field
-    adaptive_crop = min(max_location + 10, 100)
+    adaptive_crop = min(max_location + 20, 100)
     
     return adaptive_crop
 

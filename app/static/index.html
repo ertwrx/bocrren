@@ -356,14 +356,14 @@
         // Component scan depth mapping (matches backend logic)
         const componentScanDepth = {
             'vendor': 30,
-            'date': 35,
-            'invoice_number': 40,
-            'reference_number': 40,
-            'custom_match': 40,
-            'targeted_label': 40,
-            'amount': 80,
-            'timestamp': 100,
-            'original_filename': 0  // Doesn't require scanning
+            'date': 40,
+            'invoice_number': 50,
+            'reference_number': 50,
+            'custom_match': 50,
+            'targeted_label': 50,
+            'amount': 100,  // Forces full scan
+            'timestamp': 0,  // Generated, not scanned
+            'original_filename': 0  // From filename, not scanned
         };
 
         // Initialize drag and drop for components
@@ -581,35 +581,48 @@
                 return;
             }
             
-            // Calculate adaptive crop percentage (same logic as backend)
-            let maxDepth = 50;
+            // Check if Amount is selected (forces 100% scan)
+            const hasAmount = selectedComponents.some(comp => comp.type === 'amount');
+            
+            if (hasAmount) {
+                scanAreaInfo.className = 'mt-1 p-2 bg-orange-50 border border-orange-200 rounded-md text-xs text-orange-700 font-medium';
+                scanAreaInfo.innerHTML = `
+                    <span class="flex items-center justify-between">
+                        <span class="flex items-center">
+                            <svg class="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+                            </svg>
+                            Full Scan (100%)
+                        </span>
+                        <span class="text-xs opacity-75">Slower (Amount needs footer)</span>
+                    </span>
+                `;
+                return;
+            }
+            
+            // Calculate for header-only components
+            let maxDepth = 30;
             selectedComponents.forEach(comp => {
-                const depth = componentScanDepth[comp.type] || 50;
-                if (depth > maxDepth) {
-                    maxDepth = depth;
+                const depth = componentScanDepth[comp.type] || 30;
+                if (comp.type !== 'timestamp' && comp.type !== 'original_filename') {
+                    if (depth > maxDepth) {
+                        maxDepth = depth;
+                    }
                 }
             });
             
-            const adaptiveCrop = Math.min(maxDepth + 20, 100);
+            const adaptiveCrop = Math.min(maxDepth + 10, 100);
             
-            // Visual feedback
-            let color = 'indigo';
-            let speedText = 'Faster';
-            if (adaptiveCrop > 70) {
-                color = 'orange';
-                speedText = 'Slower';
-            }
-            
-            scanAreaInfo.className = `mt-1 p-2 bg-${color}-50 border border-${color}-200 rounded-md text-xs text-${color}-700 font-medium`;
+            scanAreaInfo.className = 'mt-1 p-2 bg-green-50 border border-green-200 rounded-md text-xs text-green-700 font-medium';
             scanAreaInfo.innerHTML = `
                 <span class="flex items-center justify-between">
                     <span class="flex items-center">
                         <svg class="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"></path>
                         </svg>
-                        Top ${adaptiveCrop}% (Adaptive)
+                        Top ${adaptiveCrop}% Only
                     </span>
-                    <span class="text-xs opacity-75">${speedText}</span>
+                    <span class="text-xs opacity-75">⚡ Fast! (Header only)</span>
                 </span>
             `;
         }
