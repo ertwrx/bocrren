@@ -14,7 +14,7 @@ try:
 except ImportError:
     convert_from_bytes = None
 
-def preprocess_image(image_stream, crop_top_percent=100, max_width=1920):
+def preprocess_image(image_stream, crop_top_percent=50, max_width=1920):
     """
     Converts an image stream to a preprocessed image for better OCR.
     
@@ -63,17 +63,20 @@ def process_file_stream(file_stream, file_extension, crop_top_percent=50, max_wi
         max_width: Maximum width for image processing (default 1920px)
         component_list: List of components user wants to extract (for adaptive cropping)
     """
-    # ADAPTIVE CROPPING: Adjust crop percentage based on what user is looking for
-    adaptive_crop = calculate_adaptive_crop(component_list)
-    if adaptive_crop != crop_top_percent:
-        print(f"[ADAPTIVE CROPPING] Adjusted crop from {crop_top_percent}% to {adaptive_crop}% based on components: {component_list}")
-        crop_top_percent = adaptive_crop
+    # ADAPTIVE CROPPING: Only adjust if NOT explicitly set to 100
+    if crop_top_percent != 100:
+        adaptive_crop = calculate_adaptive_crop(component_list)
+        if adaptive_crop != crop_top_percent:
+            print(f"[ADAPTIVE CROPPING] Adjusted crop from {crop_top_percent}% to {adaptive_crop}% based on components: {component_list}")
+            crop_top_percent = adaptive_crop
+    else:
+        print(f"[FORCED SCAN] Scanning full document (100%) - adaptive cropping disabled")
     
     try:
         if file_extension in ['.jpg', '.jpeg', '.png', '.tiff', '.bmp']:
             processed_pil_image = preprocess_image(file_stream, crop_top_percent, max_width)
-            # Use PSM 6 for better performance on document blocks
-            return pytesseract.image_to_string(processed_pil_image, lang='eng', config='--psm 6')
+            # Use PSM 4 for single column with mixed text/tables
+            return pytesseract.image_to_string(processed_pil_image, lang='eng', config='--psm 4')
         
         elif file_extension == '.pdf':
             if not convert_from_bytes:
@@ -110,7 +113,7 @@ def process_file_stream(file_stream, file_extension, crop_top_percent=50, max_wi
                 _, thresh = cv2.threshold(gray, 127, 255, cv2.THRESH_BINARY | cv2.THRESH_OTSU)
                 
                 processed_image = Image.fromarray(thresh)
-                return pytesseract.image_to_string(processed_image, lang='eng', config='--psm 6')
+                return pytesseract.image_to_string(processed_image, lang='eng', config='--psm 4')
             else:
                 raise Exception("Could not convert PDF to image.")
         else:
@@ -138,7 +141,7 @@ def calculate_adaptive_crop(component_list):
         int: Recommended crop percentage (30-100)
     """
     if not component_list:
-        return 100  # Default
+        return 50  # Default
     
     # Define where each component typically appears on documents
     component_locations = {
@@ -148,7 +151,7 @@ def calculate_adaptive_crop(component_list):
         'invoice_number': 40,
         'reference_number': 40,
         'custom_match': 40,  # Usually near header
-        'targeted_label': 40,  # Usually in header/top section
+        'targeted_label': 50,  # Usually in header/top section
         
         # Bottom section (60-100%)
         'amount': 80,  # Totals usually at bottom
@@ -165,7 +168,7 @@ def calculate_adaptive_crop(component_list):
                 max_location = component_depth
     
     # Add 20% buffer to ensure we capture the full field
-    adaptive_crop = min(max_location + 20, 100)
+    adaptive_crop = min(max_location + 10, 100)
     
     return adaptive_crop
 
