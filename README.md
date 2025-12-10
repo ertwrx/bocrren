@@ -20,11 +20,23 @@ This is currently a work-in-progress (WIP) and a personal project for learning p
 ## Getting Started
 
 
+## Prerequisites
 
-### Prerequisites
-
-* Python 3
+### System Dependencies
+* Python 3.11+ or 3.12
 * Tesseract OCR (must be installed on your system)
+  * **Ubuntu/Debian**: `sudo apt-get install tesseract-ocr`
+  * **macOS**: `brew install tesseract`
+  * **Windows**: Download from [Tesseract GitHub](https://github.com/UB-Mannheim/tesseract/wiki)
+* Poppler (for PDF support)
+  * **Ubuntu/Debian**: `sudo apt-get install poppler-utils`
+  * **macOS**: `brew install poppler`
+  * **Windows**: Download from [poppler releases](http://blog.alivate.com.au/poppler-windows/)
+
+### Python Dependencies
+```bash
+pip install -r requirements.txt
+```
 
 ### Installation
 
